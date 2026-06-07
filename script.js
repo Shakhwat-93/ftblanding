@@ -465,8 +465,9 @@ if (orderForm) {
             }
         }
 
-        // Save success timestamp
+        // Save success timestamp and order data for GTM dataLayer
         localStorage.setItem('last_order_time', Date.now().toString());
+        localStorage.setItem('latest_order', JSON.stringify(orderData));
 
         btn.innerHTML = '✔ অর্ডার সম্পন্ন হয়েছে';
         btn.style.backgroundColor = '#2A9D8F';

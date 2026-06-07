@@ -137,6 +137,53 @@
         
         if (orderId) {
             document.getElementById('order-id-display').innerHTML = `<span style="color:#6c757d; font-size:0.9rem; display:block; margin-bottom:5px;">Your Order ID</span>${orderId}`;
+            
+            // Handle DataLayer Push for Purchase Event
+            try {
+                const orderDataStr = localStorage.getItem('latest_order');
+                if (orderDataStr) {
+                    const orderData = JSON.parse(orderDataStr);
+                    
+                    // Only push if the ID matches to prevent duplicate fires on reload of different IDs
+                    if (orderData.id === orderId) {
+                        window.dataLayer = window.dataLayer || [];
+                        window.dataLayer.push({ ecommerce: null }); // Clear previous
+                        
+                        // Format items for GA4 standard
+                        const gtmItems = orderData.ordered_items.map((item, index) => ({
+                            item_name: item.name,
+                            price: item.price,
+                            quantity: item.quantity,
+                            index: index
+                        }));
+
+                        window.dataLayer.push({
+                            event: 'purchase',
+                            ecommerce: {
+                                transaction_id: orderData.id,
+                                value: orderData.amount,
+                                currency: 'BDT',
+                                shipping: orderData.shipping_zone === 'Inside dhaka' ? 60 : 130,
+                                items: gtmItems
+                            },
+                            customer: {
+                                name: orderData.customer_name,
+                                phone: orderData.phone,
+                                address: orderData.address,
+                                zone: orderData.shipping_zone
+                            }
+                        });
+
+                        console.log("GTM Purchase Event Fired:", orderData.id);
+                        
+                        // Clear the data so it doesn't fire again on page refresh
+                        localStorage.removeItem('latest_order');
+                    }
+                }
+            } catch (e) {
+                console.error("Error pushing to dataLayer", e);
+            }
+
         } else {
             document.getElementById('order-id-display').style.display = 'none';
         }
