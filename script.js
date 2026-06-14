@@ -86,7 +86,7 @@ let productVariants = [
         colorCode: "#1D3557",
         image: "images/bag-navy.jpeg",
         price: 1280,
-        inStock: true
+        inStock: false
     },
     {
         id: "red",
