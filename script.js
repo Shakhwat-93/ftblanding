@@ -71,7 +71,7 @@ window.addEventListener('scroll', () => {
 });
 
 // Product Variants & Cart Logic
-const productVariants = [
+let productVariants = [
     {
         id: "black",
         name: "Canvas Family Travel Bag - Black",
@@ -97,6 +97,37 @@ const productVariants = [
         inStock: true
     }
 ];
+
+async function fetchProductsFromDB() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('products')
+            .select('*')
+            .order('id', { ascending: true });
+            
+        if (error) {
+            console.warn('Could not fetch products from DB, using default.');
+            return;
+        }
+        
+        if (data && data.length > 0) {
+            // Update the productVariants with live DB data
+            productVariants = productVariants.map(pv => {
+                const liveData = data.find(d => d.id === pv.id);
+                if (liveData) {
+                    return { ...pv, price: liveData.price, inStock: liveData.inStock, name: liveData.name };
+                }
+                return pv;
+            });
+            // Re-render UI with new data
+            renderProductSelection();
+            updateCartUI();
+        }
+    } catch (err) {
+        console.error("Failed to fetch products:", err);
+    }
+}
 
 let cart = {
     "black": 1,
@@ -479,7 +510,10 @@ if (orderForm) {
 }
 
 // GA4 Ecommerce view_item event tracking on page load
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+    // Fetch products dynamically from DB
+    await fetchProductsFromDB();
+    
     window.dataLayer = window.dataLayer || [];
     
     const items = productVariants.map(v => ({

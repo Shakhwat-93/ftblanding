@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Admin Panel | Family Travel Bag</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #2A9D8F;
+            --bg: #f4f7f6;
+            --text: #333;
+            --border: #e0e0e0;
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 1.8rem;
+            color: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logout-btn {
+            font-size: 0.9rem;
+            color: #d32f2f;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: #f9f9f9;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        .product-img {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            object-fit: cover;
+            vertical-align: middle;
+            margin-right: 15px;
+        }
+        .product-name {
+            font-weight: 500;
+            vertical-align: middle;
+        }
+        .price-input {
+            width: 80px;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .price-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--primary);
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        .btn-save {
+            background-color: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: 0.3s;
+            display: block;
+            width: 100%;
+        }
+        .btn-save:hover {
+            background-color: #21867a;
+        }
+        .btn-save:disabled {
+            background-color: #a8d5d0;
+            cursor: not-allowed;
+        }
+        #loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Simple Password Protection -->
+    <script>
+        const storedPass = sessionStorage.getItem('admin_auth');
+        if (storedPass !== 'ftb2026') {
+            const pass = prompt('Enter Admin Password (ftb2026):');
+            if (pass === 'ftb2026') {
+                sessionStorage.setItem('admin_auth', 'ftb2026');
+            } else {
+                document.body.innerHTML = '<div style="text-align:center; padding: 50px; font-family: sans-serif; color: red;"><h1>Access Denied</h1><p>Incorrect password.</p></div>';
+                throw new Error("Access Denied");
+            }
+        }
+        
+        function logout() {
+            sessionStorage.removeItem('admin_auth');
+            window.location.reload();
+        }
+    </script>
+
+    <div class="container">
+        <h1>Product Management <span class="logout-btn" onclick="logout()">Logout</span></h1>
+        
+        <div id="loading">Loading products from Database...</div>
+        
+        <form id="adminForm" style="display: none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Price (৳)</th>
+                        <th>In Stock</th>
+                    </tr>
+                </thead>
+                <tbody id="productTableBody">
+                    <!-- Products will be injected here -->
+                </tbody>
+            </table>
+            
+            <button type="submit" class="btn-save" id="saveBtn">Save Updates to Database</button>
+        </form>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://drbpysumezfjbudxzxzj.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyYnB5c3VtZXpmamJ1ZHh6eHpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NzE0MzQsImV4cCI6MjA4ODU0NzQzNH0.Ki7U_uXoTxZ4B9x1ExBuYOnTBZwXS9acMkx7CzlT2sA';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let productsData = [];
+
+        async function fetchProducts() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('products')
+                    .select('*')
+                    .order('id', { ascending: true });
+                
+                if (error) throw error;
+                
+                productsData = data || [];
+                renderTable();
+            } catch (err) {
+                console.error("Error fetching products:", err);
+                document.getElementById('loading').innerText = "Error loading data. Make sure you created the 'products' table in Supabase.";
+                document.getElementById('loading').style.color = "red";
+            }
+        }
+
+        function renderTable() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('adminForm').style.display = 'block';
+            const tbody = document.getElementById('productTableBody');
+            tbody.innerHTML = '';
+
+            productsData.forEach(product => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <img src="${product.image}" class="product-img" alt="${product.name}">
+                        <span class="product-name">${product.name}</span>
+                    </td>
+                    <td>
+                        <input type="number" class="price-input" data-id="${product.id}" value="${product.price}" required min="0">
+                    </td>
+                    <td>
+                        <label class="switch">
+                            <input type="checkbox" class="stock-toggle" data-id="${product.id}" ${product.inStock ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('adminForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerText = "Saving to Database...";
+
+            const updates = [];
+            
+            // Gather inputs
+            document.querySelectorAll('.price-input').forEach(input => {
+                const id = input.getAttribute('data-id');
+                const price = parseFloat(input.value);
+                const stockToggle = document.querySelector(`.stock-toggle[data-id="${id}"]`);
+                const inStock = stockToggle.checked;
+                
+                updates.push({ id, price, inStock });
+            });
+
+            try {
+                // Supabase doesn't support bulk updates perfectly without RPC, so we do it in a loop
+                for (let update of updates) {
+                    const { error } = await supabaseClient
+                        .from('products')
+                        .update({ price: update.price, inStock: update.inStock })
+                        .eq('id', update.id);
+                        
+                    if (error) throw error;
+                }
+                
+                saveBtn.style.backgroundColor = "#2A9D8F";
+                saveBtn.innerText = "✔ Updates Saved Successfully!";
+                setTimeout(() => {
+                    saveBtn.innerText = "Save Updates to Database";
+                    saveBtn.disabled = false;
+                }, 2000);
+            } catch (err) {
+                console.error("Error saving:", err);
+                alert("Failed to save. Ensure your Supabase table has 'UPDATE' policies enabled for public access.");
+                saveBtn.innerText = "Save Updates to Database";
+                saveBtn.disabled = false;
+            }
+        });
+
+        // Initialize
+        fetchProducts();
+    </script>
+</body>
+</html>
